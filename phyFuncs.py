@@ -1,10 +1,51 @@
 """
-Quantum Mechanics Computational Lab Assignment 4 - 2024PHY1005 - Jaskirat Singh
+Quantum Mechanics Computational Lab Assignment 5 - 2024PHY1005 - Jaskirat Singh
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def lsf(x: np.ndarray | list,
+        y: np.ndarray | list) -> tuple | None:
+    """
+    Returns least square fit parameters: mean, std_dev, slope and intercept
+
+    Inputs:
+    x: values of independent variable
+    y: values of dependent variable
+
+    Outputs:
+    params: calculated parameters - mean, std_dev, slope and intercept
+    """
+    if len(x)!=len(y):
+        return(None)
+    
+    if type(x) == list:
+        x = np.asarray(x)
+    if type(y) == list:
+        y = np.asarray(y)
+
+    n = len(x)
+    sum_x    = np.sum(x)
+    sum_y    = np.sum(y)
+    sum_xy   = np.sum(x*y)
+    sum_x_sq = np.sum(x**2)
+
+    mean                = sum_y/n
+    # std_dev             = np.sqrt(np.sum((mean-y)**2)/n)
+    numerator_slope     = (n*sum_xy) - (sum_x*sum_y)
+    numerator_intercept = (sum_y*sum_x_sq) - (sum_xy*sum_x)
+    denominator         = (n*sum_x_sq) - (sum_x**2)
+    slope               = numerator_slope/denominator
+    intercept           = numerator_intercept/denominator   #(mean) - (slope*(np.sum(x)/n))
+    y_best = slope*x + intercept
+    res = y_best - y
+    res_mean = np.sum(res)/n
+    std_dev = np.sqrt(np.sum((res_mean-res)**2)/n)
+
+    params = (mean, std_dev, slope, intercept)
+    return(params)
 
 def my_bisection(func:function,
                  a:float,
@@ -405,3 +446,48 @@ def my_RK4(func:list,
             u[j].append(u_j_i)
 
     return(x, np.array(u))
+
+def shooting(func: list,
+             a: float,
+             b: float,
+             alpha: list,
+             u_at_right_boundary,
+             x: list,
+             y: list,
+             n: int = 100,
+             tol: float = 1e-3,
+             *args, **kwargs) -> float:
+    """
+    Uses Secant as the root finder and RK4 as the ODE solver
+
+    Inputs:
+    func: list of linear ODEs;
+    a: lower limit of solving;
+    b: upper limit of solving;
+    alpha: list of initial conditions;
+    u_at_right_boundary: boundary condition for he dependent variable at the other end of the domain;
+    x: list of two independent variables for which the residual changes sign;
+    y: list of residuals corresponding to independent variables in list x;
+    n: number of intervals;
+    tol: tolerance in residual
+
+    Outputs:
+    epsilon: the best value for energy
+    """
+    #first find next approximation using a root finder and then determine the value of residue at that point using RK4
+    x_a, x_b = x
+    f_a, f_b = y
+
+    x_new = (x_a*f_b - x_b*f_a)/(f_b-f_a) #using secant method
+
+    f_new = my_RK4(func = func, a = a, b = b, alpha = alpha, n = n, epsilon = x_new)[1][0][-1] - u_at_right_boundary
+
+    iterations = 1
+
+    while f_new>=tol:
+        iterations += 1
+        x_a = x_b; x_b = x_new; f_a = f_b; f_b = f_new
+        x_new = (x_a*f_b - x_b*f_a)/(f_b-f_a)
+        f_new = my_RK4(func, a, b, alpha, n, epsilon = x_new, *args, **kwargs)[1][0][-1] - u_at_right_boundary
+
+    return(x_new)
